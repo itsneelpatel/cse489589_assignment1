@@ -37,6 +37,8 @@
 
 void createServer(char* portNumberStr);
 void createClient(char* portNumberStr);
+char* getMyIP(int socket);
+int getMyPort(int socket);
 
 int main(int argc, char **argv)
 {

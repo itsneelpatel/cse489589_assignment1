@@ -25,6 +25,64 @@
 #define CMD_SIZE 100
 #define BUFFER_SIZE 256
 
+
+int getMyPort(int socket){
+
+    struct sockaddr_in sockaddress;
+    socklen_t len=sizeof(sockaddress);
+
+
+    if(getsockname(socket, (struct sockaddr *) & sockaddress, &len) == -1){
+        return -1;
+    }
+
+    return ntohs(sockaddress.sin_port);
+
+}
+
+char* getMyIP(){
+
+
+    const char* googleDnsServerIp = "8.8.8.8";
+    const int dnsPort = 53;
+
+    int soc = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if(soc == -1){
+        return NULL;
+    }
+
+
+
+    struct sockaddr_in googleaddress, myaddress;
+
+    memset(&googleaddress, 0 , sizeof(googleaddress));
+
+    googleaddress.sin_family = AF_INET;
+    googleaddress.sin_addr.s_addr = inet_addr( googleDnsServerIp );
+    googleaddress.sin_port = htons( dnsPort );
+
+    int connectStatus = connect( soc , (struct sockaddr*) &googleaddress , sizeof(googleaddress) );
+
+    if(connectStatus == -1){
+        return NULL;
+    }
+
+    socklen_t len = sizeof(myaddress);
+
+    if(getsockname(soc, (struct sockaddr *) & myaddress, &len) == -1){
+        return NULL;
+    }
+
+    char *strbuf = (char*) malloc(sizeof(char)*100);;
+
+    close(soc);
+
+
+    return inet_ntop(AF_INET, &myaddress.sin_addr, strbuf, 100);
+
+}
+
 void createServer(char* portNumberStr){
 
     int portNumber  =  atoi(portNumberStr);
@@ -98,18 +156,43 @@ void createServer(char* portNumberStr){
 						if(fgets(cmd, CMD_SIZE-1, stdin) == NULL) //Mind the newline character that will be written to cmd
 							exit(-1);
 
-                        printf("\nI got: %s\n", cmd);
-
 
                         cmd[strlen(cmd) - 1] = '\0';
-
-
 
                         if(!strcmp("AUTHOR", cmd)){
 
                             cse4589_print_and_log("[AUTHOR:SUCCESS]\n");
                             cse4589_print_and_log("I, vputta, have read and understood the course academic integrity policy.\n");
                             cse4589_print_and_log("[AUTHOR:END]\n");
+
+                        } else if(!strcmp("IP", cmd)){
+                            char* ip = getMyIP();
+
+                            if(ip != NULL){
+
+                                cse4589_print_and_log("[IP:SUCCESS]\n");
+                                cse4589_print_and_log("IP:%s\n", ip);
+                            } else {
+                                cse4589_print_and_log("[IP:ERROR]\n");
+                            }
+                            cse4589_print_and_log("[IP:END]\n");
+
+
+                        } else if(!strcmp("PORT", cmd)){
+                            int port = getMyPort(server_socket);
+
+                            if(port != -1){
+                                cse4589_print_and_log("[PORT:SUCCESS]\n");
+                                cse4589_print_and_log("PORT:%d\n", port);
+                            } else {
+                                cse4589_print_and_log("[PORT:ERROR]\n");
+                            }
+                            cse4589_print_and_log("[PORT:END]\n");
+
+
+                        } else if(!strcmp("LIST", cmd)) {
+
+
 
                         }
 
@@ -166,3 +249,6 @@ void createServer(char* portNumberStr){
 
 
 }
+
+
+
