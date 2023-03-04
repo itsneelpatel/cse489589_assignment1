@@ -159,6 +159,7 @@ void createServer(char* portNumberStr){
 
 	                        while(temp){
 	                        cse4589_print_and_log("%-5d%-35s%-20s%-8d\n", i++, temp->client_host_name, temp->client_ip, temp->client_port);
+	                        temp = temp ->next;
 	                        }
 
 	                        cse4589_print_and_log("[LIST:END]\n");
