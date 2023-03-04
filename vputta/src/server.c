@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include "../include/logger.h"
 #include "../include/global.h"
+#include "../include/commons.h"
+
 
 
 #include <sys/socket.h>
@@ -26,62 +28,19 @@
 #define BUFFER_SIZE 256
 
 
-int getMyPort(int socket){
+struct connection{
 
-    struct sockaddr_in sockaddress;
-    socklen_t len=sizeof(sockaddress);
+    int client_port;
+    char client_ip[64];
+    char client_host_name[64];
+    int fd_socket;
 
+    struct connection *next;
 
-    if(getsockname(socket, (struct sockaddr *) & sockaddress, &len) == -1){
-        return -1;
-    }
-
-    return ntohs(sockaddress.sin_port);
-
-}
-
-char* getMyIP(){
-
-
-    const char* googleDnsServerIp = "8.8.8.8";
-    const int dnsPort = 53;
-
-    int soc = socket(AF_INET, SOCK_DGRAM, 0);
-
-    if(soc == -1){
-        return NULL;
-    }
+} *connectionListHead = NULL;
 
 
 
-    struct sockaddr_in googleaddress, myaddress;
-
-    memset(&googleaddress, 0 , sizeof(googleaddress));
-
-    googleaddress.sin_family = AF_INET;
-    googleaddress.sin_addr.s_addr = inet_addr( googleDnsServerIp );
-    googleaddress.sin_port = htons( dnsPort );
-
-    int connectStatus = connect( soc , (struct sockaddr*) &googleaddress , sizeof(googleaddress) );
-
-    if(connectStatus == -1){
-        return NULL;
-    }
-
-    socklen_t len = sizeof(myaddress);
-
-    if(getsockname(soc, (struct sockaddr *) & myaddress, &len) == -1){
-        return NULL;
-    }
-
-    char *strbuf = (char*) malloc(sizeof(char)*100);;
-
-    close(soc);
-
-
-    return inet_ntop(AF_INET, &myaddress.sin_addr, strbuf, 100);
-
-}
 
 void createServer(char* portNumberStr){
 
@@ -192,6 +151,17 @@ void createServer(char* portNumberStr){
 
                         } else if(!strcmp("LIST", cmd)) {
 
+                            cse4589_print_and_log("[LIST:SUCCESS]\n");
+
+                            struct connection * temp = connectionListHead;
+
+	                        int i = 1;
+
+	                        while(temp){
+	                        cse4589_print_and_log("%-5d%-35s%-20s%-8d\n", i++, temp->client_host_name, temp->client_ip, temp->client_port);
+	                        }
+
+	                        cse4589_print_and_log("[LIST:END]\n");
 
 
                         }
@@ -211,17 +181,75 @@ void createServer(char* portNumberStr){
 
 						printf("\nRemote Host connected!\n");
 
+                        char *ip = (char*) malloc(sizeof(char)*INET_ADDRSTRLEN);
+
+                        inet_ntop(AF_INET, &client_addr.sin_addr, ip, INET_ADDRSTRLEN);
+
+                        char hostName[256];
+                        getnameinfo((struct sockaddr *)&client_addr, caddr_len,hostName, sizeof(hostName), 0,0,0);
+
+
 						/* Add to watched socket list */
 						FD_SET(fdaccept, &master_list);
 						if(fdaccept > head_socket) head_socket = fdaccept;
+
+
+						//create a connection node and add it to list
+
+						struct connection * newCon = (struct connection *) malloc(sizeof (struct connection));
+                            newCon->client_port = ntohs(client_addr.sin_port);
+                            strcpy(newCon->client_ip, ip);
+                            strcpy(newCon->client_host_name, hostName);
+                            newCon->fd_socket= fdaccept;
+                            newCon->next = NULL;
+
+                        if(connectionListHead == NULL){
+
+                            connectionListHead = newCon;
+
+                        } else{
+                            struct connection *temp = connectionListHead;
+
+                            if( temp->client_port > newCon->client_port){
+
+                                newCon->next = temp;
+                                connectionListHead = newCon;
+
+                            } else {
+                                while( temp->next!= NULL && temp->next->client_port <  newCon->client_port ){
+
+                                    temp = temp->next;
+
+
+                                }
+
+                                newCon->next = temp->next;
+                                temp->next = newCon;
+                            }
+
+
+                        }
+
+						/*strcpy(server_data.cmd,"LOGLISTOVER");
+						if(send(fdaccept, &server_data, sizeof(server_data), 0) == sizeof(server_data))
+	                            {
+
+									printf("Done!\n");
+	                            }*/
+							fflush(stdout);
+
+
+
+
+
 					}
 					/* Read from existing clients */
 					else{
 						/* Initialize buffer to receieve response */
-						char *buffer = (char*) malloc(sizeof(char)*BUFFER_SIZE);
-						memset(buffer, '\0', BUFFER_SIZE);
+						struct message received;
+						memset(&received, '\0', sizeof(received));
 
-						if(recv(sock_index, buffer, BUFFER_SIZE, 0) <= 0){
+						if(recv(sock_index, &received, sizeof(received), 0) <= 0){
 							close(sock_index);
 							printf("Remote Host terminated connection!\n");
 
@@ -231,14 +259,13 @@ void createServer(char* portNumberStr){
 						else {
 							//Process incoming data from existing clients here ...
 
-							printf("\nClient sent me: %s\n", buffer);
+							printf("\nClient sent me: %s\n", received.cmd);
 							printf("ECHOing it back to the remote host ... ");
-							if(send(fdaccept, buffer, strlen(buffer), 0) == strlen(buffer))
-								printf("Done!\n");
+							//if(send(fdaccept, buffer, strlen(buffer), 0) == strlen(buffer))
+								//printf("Done!\n");
 							fflush(stdout);
 						}
 
-						free(buffer);
 					}
 				}
 			}

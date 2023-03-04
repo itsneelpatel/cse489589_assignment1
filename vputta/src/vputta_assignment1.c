@@ -25,6 +25,23 @@
 
 #include "../include/global.h"
 #include "../include/logger.h"
+#include "../include/commons.h"
+
+
+#include <sys/socket.h>
+#include <strings.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <unistd.h>
+#include <errno.h>
 
 /**
  * main function
@@ -37,8 +54,8 @@
 
 void createServer(char* portNumberStr);
 void createClient(char* portNumberStr);
-char* getMyIP(int socket);
-int getMyPort(int socket);
+
+
 
 int main(int argc, char **argv)
 {
@@ -63,7 +80,7 @@ int main(int argc, char **argv)
 
 	} else if( argv[1][0] == 'c'){
 
-       createServer(argv[2]);
+       createClient(argv[2]);
 
 	} else {
 
@@ -76,3 +93,87 @@ int main(int argc, char **argv)
 	return 0;
 
 }
+
+
+
+
+char* getMyIP(){
+
+
+    const char* googleDnsServerIp = "8.8.8.8";
+    const int dnsPort = 53;
+
+    int soc = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if(soc == -1){
+        return NULL;
+    }
+
+    struct sockaddr_in googleaddress, myaddress;
+
+    memset(&googleaddress, 0 , sizeof(googleaddress));
+
+    googleaddress.sin_family = AF_INET;
+    googleaddress.sin_addr.s_addr = inet_addr( googleDnsServerIp );
+    googleaddress.sin_port = htons( dnsPort );
+
+    int connectStatus = connect( soc , (struct sockaddr*) &googleaddress , sizeof(googleaddress) );
+
+    if(connectStatus == -1){
+        return NULL;
+    }
+
+    socklen_t len = sizeof(myaddress);
+
+    if(getsockname(soc, (struct sockaddr *) & myaddress, &len) == -1){
+        return NULL;
+    }
+
+    char *ip = (char*) malloc(sizeof(char)*INET_ADDRSTRLEN);
+
+    close(soc);
+
+
+
+    return inet_ntop(AF_INET, &myaddress.sin_addr, ip, INET_ADDRSTRLEN);
+
+}
+
+char* getMyHostName(){
+
+    char* hostbuffer = (char*) malloc(sizeof(char)*256);
+    char * IPbuffer;
+    struct hostent * host_entry;
+    int hostname;
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+
+    return hostbuffer;
+
+}
+
+
+int getMyPort(int socket){
+
+    struct sockaddr_in sockaddress;
+    socklen_t len=sizeof(sockaddress);
+
+
+    if(getsockname(socket, (struct sockaddr *) & sockaddress, &len) == -1){
+        return -1;
+    }
+
+    return ntohs(sockaddress.sin_port);
+
+}
+
+int credsValid(char* ip, char* port){
+
+    //complete this function
+
+    //ip should be valid. refer to the senior's code
+
+    //port should be numeric && between 1 to 65535
+
+    return 0;
+}
+
