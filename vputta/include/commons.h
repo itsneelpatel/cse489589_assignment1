@@ -10,6 +10,7 @@ struct message{
     char cmd[10];
     char ip[32];
     char info[256];
+    int port;
 };
 #endif
 

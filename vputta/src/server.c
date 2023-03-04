@@ -39,8 +39,108 @@ struct connection{
 
 } *connectionListHead = NULL;
 
+void addConnectionToList(char* ip, int port, char* hostName, int fdsocket){
 
 
+	struct connection * newCon = (struct connection *) malloc(sizeof (struct connection));
+                newCon->client_port = port;
+                strcpy(newCon->client_ip, ip);
+                strcpy(newCon->client_host_name, hostName);
+                            newCon->fd_socket= fdsocket;
+                            newCon->next = NULL;
+
+                        if(connectionListHead == NULL){
+
+                            connectionListHead = newCon;
+
+                        } else{
+                            struct connection *temp = connectionListHead;
+
+                            if( temp->client_port > newCon->client_port){
+
+                                newCon->next = temp;
+                                connectionListHead = newCon;
+
+                            } else {
+                                while( temp->next!= NULL && temp->next->client_port <  newCon->client_port ){
+
+                                    temp = temp->next;
+
+
+                                }
+
+                                newCon->next = temp->next;
+                                temp->next = newCon;
+                            }
+
+
+                        }
+
+}
+void removeConnectionFromList(char* ip, int port){
+
+      if(connectionListHead != NULL){
+
+                                    struct connection * temp = connectionListHead;
+
+                                    if(strcmp(temp ->client_ip, ip) == 0 && temp ->client_port == port){
+
+                                        connectionListHead  = temp->next;
+
+                                    } else {
+
+
+                                        while(temp->next != NULL ){
+
+
+
+                                            if( strcmp(temp->next->client_ip, ip) == 0 && temp -> next->client_port == port){
+
+
+                                                struct connection *tbf = temp->next;
+                                                temp->next = temp->next->next;
+
+                                                break;
+
+                                                free(tbf);
+
+                                            }
+
+                                            temp = temp->next;
+
+                                        }
+
+
+                                    }
+
+                                }
+}
+
+
+
+
+int getFdSocket(char* ip, int port){
+
+    if(connectionListHead != NULL){
+
+        struct connection * temp = connectionListHead;
+
+        while(temp){
+
+        if(strcmp(temp ->client_ip, ip) == 0 && temp ->client_port == port){
+
+                                      break;
+
+                                    }
+            temp = temp ->next;
+        }
+
+        return temp ->fd_socket;
+    }
+
+    return -1;
+
+}
 
 void createServer(char* portNumberStr){
 
@@ -158,8 +258,8 @@ void createServer(char* portNumberStr){
 	                        int i = 1;
 
 	                        while(temp){
-	                        cse4589_print_and_log("%-5d%-35s%-20s%-8d\n", i++, temp->client_host_name, temp->client_ip, temp->client_port);
-	                        temp = temp ->next;
+                                cse4589_print_and_log("%-5d%-35s%-20s%-8d\n", i++, temp->client_host_name, temp->client_ip, temp->client_port);
+                                temp = temp ->next;
 	                        }
 
 	                        cse4589_print_and_log("[LIST:END]\n");
@@ -180,7 +280,6 @@ void createServer(char* portNumberStr){
 						if(fdaccept < 0)
 							perror("Accept failed.");
 
-						printf("\nRemote Host connected!\n");
 
                         char *ip = (char*) malloc(sizeof(char)*INET_ADDRSTRLEN);
 
@@ -197,47 +296,30 @@ void createServer(char* portNumberStr){
 
 						//create a connection node and add it to list
 
-						struct connection * newCon = (struct connection *) malloc(sizeof (struct connection));
-                            newCon->client_port = ntohs(client_addr.sin_port);
-                            strcpy(newCon->client_ip, ip);
-                            strcpy(newCon->client_host_name, hostName);
-                            newCon->fd_socket= fdaccept;
-                            newCon->next = NULL;
+						int port = ntohs(client_addr.sin_port);
 
-                        if(connectionListHead == NULL){
-
-                            connectionListHead = newCon;
-
-                        } else{
-                            struct connection *temp = connectionListHead;
-
-                            if( temp->client_port > newCon->client_port){
-
-                                newCon->next = temp;
-                                connectionListHead = newCon;
-
-                            } else {
-                                while( temp->next!= NULL && temp->next->client_port <  newCon->client_port ){
-
-                                    temp = temp->next;
+						addConnectionToList(ip,port,hostName, fdaccept);
 
 
-                                }
-
-                                newCon->next = temp->next;
-                                temp->next = newCon;
-                            }
+						char connscopy[256];
+                        memset(connscopy, '\0', sizeof(connscopy));
 
 
-                        }
+                        struct connection * temp = connectionListHead;
 
-						/*strcpy(server_data.cmd,"LOGLISTOVER");
-						if(send(fdaccept, &server_data, sizeof(server_data), 0) == sizeof(server_data))
-	                            {
+                        int i = 1;
 
-									printf("Done!\n");
-	                            }*/
-							fflush(stdout);
+                        while(temp){
+                            char str[128];
+                            sprintf(str,"%-5d%-35s%-20s%-8d\n", i++, temp->client_host_name, temp->client_ip, temp->client_port );
+
+                            strcat(connscopy, str);
+                            temp = temp ->next;
+	                        }
+
+
+                        send(fdaccept, connscopy, sizeof(connscopy), 0);
+                        fflush(stdout);
 
 
 
@@ -250,9 +332,10 @@ void createServer(char* portNumberStr){
 						struct message received;
 						memset(&received, '\0', sizeof(received));
 
+
 						if(recv(sock_index, &received, sizeof(received), 0) <= 0){
+
 							close(sock_index);
-							printf("Remote Host terminated connection!\n");
 
 							/* Remove from watched list */
 							FD_CLR(sock_index, &master_list);
@@ -260,8 +343,46 @@ void createServer(char* portNumberStr){
 						else {
 							//Process incoming data from existing clients here ...
 
-							printf("\nClient sent me: %s\n", received.cmd);
-							printf("ECHOing it back to the remote host ... ");
+							if(!strcmp("REFRESH", received.cmd)){
+
+                            char *ip = received.ip;
+                            int port = received.port;
+
+                            int fdsoc = getFdSocket(ip,port);
+
+                            char connscopy[256];
+                            memset(connscopy, '\0', sizeof(connscopy));
+
+
+                            struct connection * temp = connectionListHead;
+
+	                        int i = 1;
+
+	                        while(temp){
+                                char str[128];
+                                sprintf(str,"%-5d%-35s%-20s%-8d\n", i++, temp->client_host_name, temp->client_ip, temp->client_port );
+
+                                strcat(connscopy, str);
+                                temp = temp ->next;
+	                        }
+
+
+                            send(fdsoc, connscopy, sizeof(connscopy), 0);
+
+                        } else if(!strcmp("EXIT", received.cmd)){
+
+
+                            char* ip = received.ip;
+                            int port = atoi(received.info);
+
+
+                            removeConnectionFromList(ip, port);
+
+
+
+							}
+
+
 							//if(send(fdaccept, buffer, strlen(buffer), 0) == strlen(buffer))
 								//printf("Done!\n");
 							fflush(stdout);

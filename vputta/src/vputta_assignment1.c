@@ -166,14 +166,31 @@ int getMyPort(int socket){
 
 }
 
-int credsValid(char* ip, char* port){
-
-    //complete this function
-
-    //ip should be valid. refer to the senior's code
-
-    //port should be numeric && between 1 to 65535
-
-    return 0;
+int isNumeric(char *str) {
+    while (*str != '\0') {
+        if (*str < '0' || *str > '9') {
+            return 0;
+        }
+        str++;
+    }
+    return 1;
 }
 
+int isValidPort(char *port) {
+    int num = atoi(port);
+    return num >= 1 && num <= 65535;
+}
+
+int credsValid(char* ip, char* port){
+    // Validate IP address
+    struct sockaddr_in temp;
+    int result = inet_pton(AF_INET, ip, &temp.sin_addr);
+    if (result != 1) {
+        return 0;
+    }
+    // Validate port number
+    if (!isNumeric(port) || !isValidPort(port)) {
+        return 0;
+    }
+    return 1;
+}

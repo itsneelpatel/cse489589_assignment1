@@ -29,6 +29,10 @@
 
 int is_logged_in = 0;
 
+char connectionsCopy[256];
+
+
+
 
 
 void createClient(char* portNumberStr){
@@ -108,9 +112,7 @@ void createClient(char* portNumberStr){
         } else if(!strcmp("LIST", cmd)) {
 
                 cse4589_print_and_log("[LIST:SUCCESS]\n");
-
-
-
+                cse4589_print_and_log("%s", connectionsCopy);
                 cse4589_print_and_log("[LIST:END]\n");
 
 
@@ -121,25 +123,45 @@ void createClient(char* portNumberStr){
             ip = strtok(NULL, " ");
             port = strtok(NULL, " ");
 
+
+            if(credsValid(ip, port)){
+            cse4589_print_and_log("[LOGIN:SUCCESS]\n");
             connect_to_host(client_socket,ip, port);
 
             struct message msg;
             char info[256];
             strcpy(msg.cmd,"LOGIN");
             strcpy(msg.ip,getMyIP());
+            msg.port = getMyPort(client_socket);
             sprintf(info, "%s %d", getMyHostName(), getMyPort(client_socket));
 
             strcpy(msg.info, info);
 
-            printf("%s", msg.info);
             send(client_socket, &msg, sizeof(msg), 0);
 
 
 
             is_logged_in = 1;
 
+            memset(connectionsCopy, '\0', 256);
+
+            if(recv(client_socket, connectionsCopy, sizeof(connectionsCopy), 0) <= 0){
+
+
+            }
+
+            cse4589_print_and_log("[LOGIN:END]\n");
+
+
+
 
             fflush(stdout);
+            } else {
+
+                cse4589_print_and_log("[LOGIN:ERROR]\n");
+                cse4589_print_and_log("[LOGIN:END]\n");
+
+            }
 
 
 
@@ -150,7 +172,44 @@ void createClient(char* portNumberStr){
 
         } else if(!strcmp("REFRESH", cmd)){
 
+            struct message msg;
+            strcpy(msg.cmd,"REFRESH");
+            strcpy(msg.ip,getMyIP());
+            msg.port = getMyPort(client_socket);
+
+            send(client_socket, &msg, sizeof(msg), 0);
+
+            memset(connectionsCopy, '\0', 256);
+
+            if(recv(client_socket, connectionsCopy, sizeof(connectionsCopy), 0) <= 0){
+
+
+            }
+
+             cse4589_print_and_log("[REFRESH:SUCCESS]\n");
+             cse4589_print_and_log("[REFRESH:END]\n");
+
+
+
+            fflush(stdout);
+
         } else if(!strcmp("EXIT", cmd)){
+
+            struct message msg;
+            char info[256];
+            strcpy(msg.cmd,"EXIT");
+            strcpy(msg.ip,getMyIP());
+            sprintf(info, "%d", getMyPort(client_socket));
+
+            strcpy(msg.info, info);
+
+            send(client_socket, &msg, sizeof(msg), 0);
+
+            close(client_socket);
+
+
+            fflush(stdout);
+            exit(0);
 
         }
 
@@ -172,8 +231,6 @@ void createClient(char* portNumberStr){
 void connect_to_host(int client_socket, char *server_ip, char* server_port)
 {
 
-printf("%d %s %s", client_socket, server_ip, server_port);
-
 	struct addrinfo hints, *res;
 
 	/* Set up hints structure */
@@ -190,7 +247,6 @@ printf("%d %s %s", client_socket, server_ip, server_port);
 	if(connect(client_socket, res->ai_addr, res->ai_addrlen) < 0)
 		perror("Connect failed");
 
-    printf("connection pass");
 
 	freeaddrinfo(res);
 
