@@ -32,7 +32,7 @@ int is_logged_in = 0;
 char connectionsCopy[256];
 
 
-
+void connect_to_host(int client_socket, char *server_ip, char* server_port);
 
 
 void createClient(char* portNumberStr){
